@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from models.database import engine, Base
-#from api import jobs, cvs, applications, cover_letters
+from api import jobs
 
 # Crée les tables
 Base.metadata.create_all(bind=engine)
@@ -31,11 +31,8 @@ def root():
         "docs": "/docs"
     }
 
-# Include routers (todo)
-# app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
-# app.include_router(cvs.router, prefix="/api/cvs", tags=["cvs"])
-# app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
-# app.include_router(cover_letters.router, prefix="/api/cover-letters", tags=["cover-letters"])
+# Include router jobs
+app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 
 if __name__ == "__main__":
     import uvicorn
