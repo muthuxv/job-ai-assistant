@@ -1,5 +1,6 @@
 # backend/services/job_analyzer.py
-from anthropic import Anthropic
+from google import genai
+from google.genai import types
 import os
 import json
 from dotenv import load_dotenv
@@ -8,7 +9,7 @@ load_dotenv()
 
 class JobAnalyzer:
     def __init__(self):
-        self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     
     def analyze_job(self, job_description: str) -> dict:
         """
@@ -20,7 +21,7 @@ class JobAnalyzer:
 OFFRE D'EMPLOI :
 {job_description}
 
-Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte (pas de markdown, pas de ```json) :
+Retourne UNIQUEMENT un objet JSON valide (pas de markdown, pas de ```json) :
 {{
   "title": "titre exact du poste",
   "company": "nom de l'entreprise (ou 'Non spécifié' si absent)",
@@ -40,19 +41,21 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte (pas de mar
 Sois précis et extrait TOUT ce qui est pertinent."""
 
         try:
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2500,
-                temperature=0.2,
-                messages=[{"role": "user", "content": prompt}]
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=2500,
+                )
             )
             
-            # Parse le JSON
-            content = response.content[0].text.strip()
+            content = response.text.strip()
             
             # Enlève les ```json si présents
             if content.startswith("```"):
-                content = content.split("```")[1]
+                lines = content.split("\n")
+                content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
                 if content.startswith("json"):
                     content = content[4:]
             
@@ -61,7 +64,7 @@ Sois précis et extrait TOUT ce qui est pertinent."""
             
         except json.JSONDecodeError as e:
             print(f"❌ Erreur JSON : {e}")
-            print(f"Réponse brute : {response.content[0].text}")
+            print(f"Réponse brute : {response.text[:500]}")
             raise
         except Exception as e:
             print(f"❌ Erreur analyse : {e}")
@@ -92,16 +95,20 @@ Analyse en profondeur et retourne UNIQUEMENT un JSON :
 Le score doit être entre 0 et 100. Sois réaliste et constructif."""
 
         try:
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2000,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}]
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.3,
+                    max_output_tokens=2000,
+                )
             )
             
-            content = response.content[0].text.strip()
+            content = response.text.strip()
+            
             if content.startswith("```"):
-                content = content.split("```")[1]
+                lines = content.split("\n")
+                content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
                 if content.startswith("json"):
                     content = content[4:]
             
