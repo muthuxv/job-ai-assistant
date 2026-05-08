@@ -9,40 +9,48 @@ load_dotenv()
 
 class JobAnalyzer:
     def __init__(self):
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        # Force UTF-8 dans la config du client
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
+        
+        self.client = genai.Client(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            http_options={'headers': {'Content-Type': 'application/json; charset=utf-8'}}
+        )
     
     def analyze_job(self, job_description: str) -> dict:
         """
-        Analyse une offre d'emploi et extrait toutes les infos importantes
+        Analyse une offre d'emploi
         """
         
-        prompt = f"""Tu es un expert en recrutement tech. Analyse cette offre d'emploi et extrais les informations suivantes.
+        # Encode explicitement en UTF-8
+        if isinstance(job_description, str):
+            job_description = job_description.encode('utf-8').decode('utf-8')
+        
+        prompt = """Tu es un expert en recrutement tech. Analyse cette offre.
 
 OFFRE D'EMPLOI :
-{job_description}
+""" + job_description + """
 
-Retourne UNIQUEMENT un objet JSON valide (pas de markdown, pas de ```json) :
-{{
-  "title": "titre exact du poste",
-  "company": "nom de l'entreprise (ou 'Non spécifié' si absent)",
-  "location": "lieu (ou 'Non spécifié')",
-  "contract_type": "CDI/CDD/Freelance/Stage (ou 'Non spécifié')",
-  "technical_skills": ["compétence technique 1", "compétence technique 2"],
-  "soft_skills": ["soft skill 1", "soft skill 2"],
-  "ats_keywords": ["mot-clé important 1", "mot-clé 2"],
+Retourne UNIQUEMENT un JSON valide :
+{
+  "title": "titre du poste",
+  "company": "entreprise",
+  "location": "lieu",
+  "contract_type": "CDI/CDD/Freelance/Stage",
+  "technical_skills": ["skill1", "skill2"],
+  "soft_skills": ["skill1", "skill2"],
+  "ats_keywords": ["keyword1", "keyword2"],
   "experience_level": "junior/mid/senior/lead",
-  "key_responsibilities": ["responsabilité 1", "responsabilité 2"],
-  "required_education": "niveau requis (ou 'Non spécifié')",
-  "salary_range": "fourchette si mentionnée (ou 'Non spécifié')",
-  "benefits": ["avantage 1", "avantage 2"],
-  "nice_to_have": ["compétence bonus 1", "compétence bonus 2"]
-}}
-
-Sois précis et extrait TOUT ce qui est pertinent."""
+  "key_responsibilities": ["resp1", "resp2"],
+  "required_education": "niveau requis",
+  "salary_range": "fourchette",
+  "benefits": ["avantage1", "avantage2"],
+  "nice_to_have": ["bonus1", "bonus2"]
+}"""
 
         try:
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model='gemini-3-flash-preview',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.2,
@@ -52,7 +60,7 @@ Sois précis et extrait TOUT ce qui est pertinent."""
             
             content = response.text.strip()
             
-            # Enlève les ```json si présents
+            # Nettoie
             if content.startswith("```"):
                 lines = content.split("\n")
                 content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
@@ -62,41 +70,40 @@ Sois précis et extrait TOUT ce qui est pertinent."""
             analysis = json.loads(content.strip())
             return analysis
             
-        except json.JSONDecodeError as e:
-            print(f"❌ Erreur JSON : {e}")
-            print(f"Réponse brute : {response.text[:500]}")
-            raise
         except Exception as e:
-            print(f"❌ Erreur analyse : {e}")
+            print(f"❌ Erreur : {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def calculate_match_score(self, job_analysis: dict, user_profile: dict) -> dict:
         """
-        Calcule un score de match entre l'offre et le profil du candidat
+        Calcule le match score
         """
         
-        prompt = f"""Tu es un expert en recrutement. Calcule un score de compatibilité entre ce profil candidat et cette offre.
+        job_json = json.dumps(job_analysis, indent=2, ensure_ascii=False)
+        profile_json = json.dumps(user_profile, indent=2, ensure_ascii=False)
+        
+        prompt = """Expert recrutement. Calcule compatibilite.
 
-OFFRE D'EMPLOI :
-{json.dumps(job_analysis, indent=2, ensure_ascii=False)}
+OFFRE :
+""" + job_json + """
 
-PROFIL CANDIDAT :
-{json.dumps(user_profile, indent=2, ensure_ascii=False)}
+PROFIL :
+""" + profile_json + """
 
-Analyse en profondeur et retourne UNIQUEMENT un JSON :
-{{
+Retourne JSON :
+{
   "score": 85,
-  "strengths": ["point fort 1 avec justification", "point fort 2"],
-  "gaps": ["manque 1 avec impact", "manque 2"],
-  "recommendations": ["conseil actionnable 1", "conseil 2"],
-  "fit_summary": "résumé en 2-3 phrases du fit global"
-}}
-
-Le score doit être entre 0 et 100. Sois réaliste et constructif."""
+  "strengths": ["force1", "force2"],
+  "gaps": ["manque1", "manque2"],
+  "recommendations": ["conseil1", "conseil2"],
+  "fit_summary": "resume"
+}"""
 
         try:
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model='gemini-3-flash-preview',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.3,
@@ -109,12 +116,9 @@ Le score doit être entre 0 et 100. Sois réaliste et constructif."""
             if content.startswith("```"):
                 lines = content.split("\n")
                 content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
-                if content.startswith("json"):
-                    content = content[4:]
             
-            result = json.loads(content.strip())
-            return result
+            return json.loads(content.strip())
             
         except Exception as e:
-            print(f"❌ Erreur calcul match : {e}")
+            print(f"❌ Erreur : {str(e)}")
             raise
