@@ -72,11 +72,20 @@ async def upload_cv(
         db.add(db_cv)
         db.commit()
         db.refresh(db_cv)
-        
+
+        # Compte les candidatures existantes sans score
+        from models.models import Application
+        applications_count = db.query(Application).count()
+        applications_without_score = db.query(Application).filter(
+            Application.match_score.is_(None)
+        ).count()
+
         return {
             "cv_id": db_cv.id,
             "parsed_data": parsed_data,
-            "message": "CV uploadé et analysé avec succès"
+            "message": "CV uploadé et analysé avec succès",
+            "total_applications": applications_count,
+            "applications_without_score": applications_without_score
         }
         
     except Exception as e:
