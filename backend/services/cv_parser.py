@@ -1,17 +1,11 @@
 # backend/services/cv_parser.py
-from google import genai
-from google.genai import types
 from pypdf import PdfReader
-import os
-import json
-from dotenv import load_dotenv
-
-load_dotenv()
+from services.llm_provider import BaseLLMProvider
 
 class CVParser:
-    def __init__(self):
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    
+    def __init__(self, provider: BaseLLMProvider):
+        self.provider = provider
+
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """
         Extrait le texte brut d'un PDF
@@ -19,21 +13,17 @@ class CVParser:
         try:
             reader = PdfReader(pdf_path)
             text = ""
-            
             for page in reader.pages:
                 text += page.extract_text() + "\n"
-            
             return text.strip()
-            
         except Exception as e:
             print(f"❌ Erreur extraction PDF : {e}")
             raise
-    
+
     def parse_cv(self, cv_text: str) -> dict:
         """
         Parse le CV et extrait toutes les informations structurées
         """
-        
         prompt = f"""Tu es un expert en analyse de CV. Parse ce CV et extrais TOUTES les informations importantes.
 
 CV :
@@ -55,80 +45,58 @@ Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de ```json) :
     {{
       "title": "titre du poste",
       "company": "nom entreprise",
-      "duration": "période",
+      "duration": "période (ex: 'Jan 2022 - Présent')",
       "location": "lieu si mentionné",
       "responsibilities": ["responsabilité 1", "responsabilité 2"],
-      "achievements": ["réalisation 1", "réalisation 2"]
+      "achievements": ["réalisation quantifiée 1", "réalisation 2"]
     }}
   ],
   "education": [
     {{
       "degree": "diplôme",
       "institution": "école/université",
-      "year": "année",
-      "field": "domaine"
+      "year": "année ou période",
+      "field": "domaine d'études"
     }}
   ],
   "technical_skills": {{
     "languages": ["langage 1", "langage 2"],
-    "frameworks": ["framework 1"],
-    "tools": ["outil 1"],
-    "databases": ["database 1"],
-    "other": ["autre 1"]
+    "frameworks": ["framework 1", "framework 2"],
+    "tools": ["outil 1", "outil 2"],
+    "databases": ["database 1", "database 2"],
+    "other": ["autre compétence 1", "autre 2"]
   }},
-  "soft_skills": ["soft skill 1"],
+  "soft_skills": ["soft skill 1", "soft skill 2"],
   "languages": [
     {{
       "language": "langue",
-      "level": "niveau"
+      "level": "niveau (natif/courant/intermédiaire/notions)"
     }}
   ],
   "projects": [
     {{
-      "name": "nom",
-      "description": "description",
-      "technologies": ["tech 1"],
-      "url": "lien"
+      "name": "nom du projet",
+      "description": "description courte",
+      "technologies": ["tech 1", "tech 2"],
+      "url": "lien si présent"
     }}
   ],
-  "certifications": [],
-  "interests": []
+  "certifications": ["certification 1", "certification 2"],
+  "interests": ["intérêt 1", "intérêt 2"]
 }}
 
-Sois exhaustif et précis."""
+Sois exhaustif et précis. Si une info n'est pas présente, mets une liste vide [] ou une string vide ""."""
 
         try:
-            response = self.client.models.generate_content(
-                model='gemini-3-flash-preview',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=4000,
-                )
-            )
-            
-            content = response.text.strip()
-            
-            if content.startswith("```"):
-                lines = content.split("\n")
-                content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
-                if content.startswith("json"):
-                    content = content[4:]
-            
-            parsed_cv = json.loads(content.strip())
-            return parsed_cv
-            
-        except json.JSONDecodeError as e:
-            print(f"❌ Erreur JSON parsing CV : {e}")
-            print(f"Réponse : {response.text[:500]}")
-            raise
+            print(f"🧠 Parsing CV avec {self.provider.__class__.__name__}...")
+            return self.provider.generate_json(prompt, temperature=0.1)
         except Exception as e:
             print(f"❌ Erreur parsing CV : {e}")
             raise
-    
+
     def create_user_profile(self, parsed_cv: dict) -> dict:
         """
-        Crée un profil utilisateur simplifié
+        Crée un profil utilisateur simplifié pour le matching
         """
         return {
             "name": parsed_cv["personal_info"]["name"],

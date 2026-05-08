@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Briefcase, Home, Upload } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 const Navbar = ({ hasCV }) => {
   const location = useLocation();
@@ -9,6 +10,7 @@ const Navbar = ({ hasCV }) => {
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/new', icon: Briefcase, label: 'Nouvelle candidature' },
     { path: '/upload-cv', icon: Upload, label: 'Mon CV', highlight: !hasCV },
+    { path: '/settings', icon: Settings, label: 'Paramètres' },
   ];
 
   return (

@@ -88,6 +88,7 @@ def get_application(application_id: int, db: Session = Depends(get_db)):
         "id": application.id,
         "status": application.status,
         "match_score": application.match_score,
+        "match_details": application.match_details,  # ← AJOUTE CETTE LIGNE
         "applied_date": application.applied_date,
         "notes": application.notes,
         "created_at": application.created_at,

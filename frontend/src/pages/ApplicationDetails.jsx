@@ -233,38 +233,127 @@ const ApplicationDetails = () => {
         </div>
       </div>
 
-      {/* Match Score */}
-      {match_score !== null && match_score !== undefined && (
-        <GlassCard hover={false} className="mb-6">
-          <div className="flex items-center gap-6">
-            <div className="text-center flex-shrink-0">
-              <div className="text-5xl font-black mb-1" style={{ color: getScoreColor(match_score) }}>
-                {match_score}%
-              </div>
-              <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>Compatibilité</p>
+    {/* Match Score + Details */}
+    {match_score !== null && match_score !== undefined && (
+    <GlassCard hover={false} className="mb-6">
+        
+        {/* Score principal */}
+        <div className="flex items-center gap-6 mb-4">
+        <div className="text-center flex-shrink-0">
+            <div className="text-5xl font-black mb-1" style={{ color: getScoreColor(match_score) }}>
+            {match_score}%
             </div>
-            <div className="flex-1">
-              <div className="score-bar-track mb-2" style={{ height: '10px' }}>
+            <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>Compatibilité</p>
+        </div>
+        <div className="flex-1">
+            <div className="score-bar-track mb-2" style={{ height: '10px' }}>
+            <div
+                className="h-full rounded-full"
+                style={{
+                width: `${match_score}%`,
+                background: `linear-gradient(90deg, #a855f7, ${getScoreColor(match_score)})`,
+                boxShadow: `0 0 12px ${getScoreColor(match_score)}80`,
+                transition: 'width 1.5s ease',
+                }}
+            />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: getScoreColor(match_score) }}>
+            {match_score >= 75 ? '🎉 Excellent profil pour ce poste !' :
+            match_score >= 60 ? '👍 Bon match, candidature encouragée' :
+            match_score >= 45 ? '⚡ Match moyen, soignez votre lettre' :
+            '💪 Défi ambitieux, mais pourquoi pas !'}
+            </p>
+        </div>
+        </div>
+
+        {/* Match Details - Strengths, Gaps, Recommendations */}
+        {application.match_details && (
+        <>
+            <div className="neon-divider" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            
+            {/* Strengths */}
+            {application.match_details.strengths?.length > 0 && (
                 <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${match_score}%`,
-                    background: `linear-gradient(90deg, #a855f7, ${getScoreColor(match_score)})`,
-                    boxShadow: `0 0 12px ${getScoreColor(match_score)}80`,
-                    transition: 'width 1.5s ease',
-                  }}
-                />
-              </div>
-              <p className="text-sm font-semibold" style={{ color: getScoreColor(match_score) }}>
-                {match_score >= 75 ? '🎉 Excellent profil pour ce poste !' :
-                 match_score >= 60 ? '👍 Bon match, candidature encouragée' :
-                 match_score >= 45 ? '⚡ Match moyen, soignez votre lettre' :
-                 '💪 Défi ambitieux, mais pourquoi pas !'}
-              </p>
+                className="rounded-xl p-4"
+                style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)' }}
+                >
+                <p className="font-semibold mb-3 text-sm" style={{ color: '#4ade80' }}>
+                    ✅ Points forts
+                </p>
+                <ul className="space-y-2">
+                    {application.match_details.strengths.map((s, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span style={{ color: '#4ade80' }} className="mt-0.5 flex-shrink-0">•</span>
+                        {s}
+                    </li>
+                    ))}
+                </ul>
+                </div>
+            )}
+
+            {/* Gaps */}
+            {application.match_details.gaps?.length > 0 && (
+                <div
+                className="rounded-xl p-4"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}
+                >
+                <p className="font-semibold mb-3 text-sm" style={{ color: '#f87171' }}>
+                    ⚠️ Points à travailler
+                </p>
+                <ul className="space-y-2">
+                    {application.match_details.gaps.map((g, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span style={{ color: '#f87171' }} className="mt-0.5 flex-shrink-0">•</span>
+                        {g}
+                    </li>
+                    ))}
+                </ul>
+                </div>
+            )}
             </div>
-          </div>
-        </GlassCard>
-      )}
+
+            {/* Recommendations */}
+            {application.match_details.recommendations?.length > 0 && (
+            <div
+                className="rounded-xl p-4 mt-4"
+                style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}
+            >
+                <p className="font-semibold mb-3 text-sm" style={{ color: '#a855f7' }}>
+                💡 Recommandations
+                </p>
+                <ul className="space-y-2">
+                {application.match_details.recommendations.map((r, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2"
+                    style={{ color: 'rgba(148,163,184,0.8)' }}>
+                    <span style={{ color: '#a855f7' }} className="mt-0.5 flex-shrink-0">→</span>
+                    {r}
+                    </li>
+                ))}
+                </ul>
+            </div>
+            )}
+
+            {/* Fit Summary */}
+            {application.match_details.fit_summary && (
+            <div
+                className="rounded-xl p-4 mt-4"
+                style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.2)' }}
+            >
+                <p className="font-semibold mb-2 text-sm" style={{ color: '#06b6d4' }}>
+                📊 Synthèse
+                </p>
+                <p className="text-sm" style={{ color: 'rgba(148,163,184,0.8)' }}>
+                {application.match_details.fit_summary}
+                </p>
+            </div>
+            )}
+        </>
+        )}
+    </GlassCard>
+    )}
 
       {/* Status Flow */}
       <GlassCard hover={false} className="mb-6">

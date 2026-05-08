@@ -3,6 +3,7 @@ import sys
 import os
 import locale
 
+
 # Force UTF-8 encoding AVANT tout
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['LC_ALL'] = 'en_US.UTF-8'
@@ -22,7 +23,8 @@ if sys.version_info >= (3, 7):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from models.database import engine, Base
-from api import jobs, cvs, cover_letters, applications, interview_prep
+from api import jobs, cvs, cover_letters, applications, interview_prep, settings
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -39,6 +41,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 
 @app.get("/")
 def root():

@@ -1,38 +1,69 @@
 # backend/services/interview_prep.py
-import google.generativeai as genai
-import os
+from services.llm_provider import BaseLLMProvider
 import json
-from dotenv import load_dotenv
 
-load_dotenv()
 
 class InterviewPreparer:
-    def __init__(self):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel('gemini-3-flash-preview')
-    
+    def __init__(self, provider: BaseLLMProvider):
+        self.provider = provider
+
     def generate_questions(self, job_analysis: dict, user_profile: dict) -> dict:
-        prompt = f"""Questions entretien.
+        """
+        Génère des questions d'entretien probables et des suggestions de réponses
+        """
 
-OFFRE : {job_analysis['title']}
+        prompt = f"""Tu es un expert en préparation d'entretiens. Génère des questions d'entretien probables pour cette candidature.
 
-Retourne JSON avec general_questions, technical_questions, behavioral_questions, questions_to_ask, red_flags_to_avoid, strengths_to_highlight."""
+OFFRE D'EMPLOI :
+Poste : {job_analysis['title']}
+Entreprise : {job_analysis['company']}
+Compétences requises : {', '.join(job_analysis['technical_skills'][:10])}
+Responsabilités : {', '.join(job_analysis['key_responsibilities'][:5])}
+
+PROFIL CANDIDAT :
+{json.dumps(user_profile, indent=2, ensure_ascii=False)}
+
+Génère UNIQUEMENT un JSON avec cette structure :
+{{
+  "general_questions": [
+    {{
+      "question": "question générale",
+      "why_asked": "pourquoi cette question",
+      "tips": "conseils pour bien répondre",
+      "example_answer": "exemple de réponse structurée (pas à réciter tel quel)"
+    }}
+  ],
+  "technical_questions": [
+    {{
+      "question": "question technique",
+      "topic": "sujet technique concerné",
+      "tips": "comment l'aborder",
+      "key_points": ["point clé 1", "point clé 2"]
+    }}
+  ],
+  "behavioral_questions": [
+    {{
+      "question": "question comportementale",
+      "framework": "méthode STAR recommandée",
+      "your_example": "exemple concret du CV du candidat à utiliser"
+    }}
+  ],
+  "questions_to_ask": [
+    {{
+      "question": "question à poser au recruteur",
+      "why": "pourquoi cette question est pertinente",
+      "shows": "ce que ça montre de toi"
+    }}
+  ],
+  "red_flags_to_avoid": ["erreur à éviter 1", "erreur 2"],
+  "strengths_to_highlight": ["force à mettre en avant 1", "force 2"]
+}}
+
+Génère 3-4 questions par catégorie. Base-toi sur le profil réel du candidat pour les exemples."""
 
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(temperature=0.5, max_output_tokens=4000)
-            )
-
-            content = response.text.strip()
-
-            if content.startswith("```"):
-                lines = content.split("\n")
-                content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
-                if content.startswith("json"):
-                    content = content[4:]
-
-            return json.loads(content.strip())
+            print(f"🎤 Génération préparation entretien avec {self.provider.__class__.__name__}...")
+            return self.provider.generate_json(prompt, temperature=0.5)
         except Exception as e:
-            print(f"❌ Erreur : {e}")
+            print(f"❌ Erreur génération questions : {e}")
             raise

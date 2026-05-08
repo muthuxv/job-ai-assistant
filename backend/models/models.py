@@ -24,6 +24,7 @@ class Application(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"))
     status = Column(String, default="draft")
     match_score = Column(Float, nullable=True)
+    match_details = Column(JSON, nullable=True)
     applied_date = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -52,3 +53,13 @@ class UserCV(Base):
     parsed_data = Column(JSON)
     is_active = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, default="gemini")  # gemini, claude, openai
+    api_key = Column(String, nullable=True)
+    model_name = Column(String, nullable=True)   # Override optionnel
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

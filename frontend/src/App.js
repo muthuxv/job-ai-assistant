@@ -6,6 +6,8 @@ import UploadCV from './pages/UploadCV';
 import NewApplication from './pages/NewApplication';
 import ApplicationDetail from './pages/ApplicationDetails';
 import { getActiveCV } from './services/api';
+import Settings from './pages/Settings';
+
 
 function App() {
   const [hasCV, setHasCV] = useState(false);
@@ -31,6 +33,7 @@ function App() {
             <Route path="/new" element={<NewApplication />} />
             <Route path="/upload-cv" element={<UploadCV onCVUploaded={() => setHasCV(true)} />} />
             <Route path="/application/:id" element={<ApplicationDetail />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>
       </div>

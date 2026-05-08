@@ -15,6 +15,7 @@
 - **🎤 Interview Preparation** — Likely questions (general, technical, behavioural), STAR framework tips, and questions to ask the recruiter
 - **📊 Application Tracker** — Dashboard to manage all your applications with status tracking (Draft → Applied → Interview → Offer)
 - **📄 CV Parsing** — Upload your CV once, AI extracts your full profile for automatic personalisation
+- **🔌 Multi-provider LLM** — Choose your preferred AI provider: Google Gemini, Anthropic Claude or OpenAI GPT
 
 ---
 
@@ -25,9 +26,10 @@
 |------|-------|
 | **FastAPI** | REST API with auto-generated Swagger docs |
 | **SQLAlchemy** | ORM with PostgreSQL / SQLite |
-| **Google Gemini** | LLM for analysis, generation and embeddings |
-| **Anthropic Claude** | Writing quality for cover letters |
-| **LangChain** | LLM orchestration framework |
+| **LLM Provider Layer** | Abstraction over Gemini, Claude and OpenAI |
+| **Google Gemini** | Default LLM — fast, cost-effective, generous free tier |
+| **Anthropic Claude** | Optional — best for nuanced writing |
+| **OpenAI GPT** | Optional — reliable, versatile |
 | **PyPDF** | CV text extraction |
 
 ### Frontend
@@ -46,7 +48,7 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   React Frontend                         │
-│   Dashboard · New Application · CV Upload · Detail      │
+│  Dashboard · New Application · CV Upload · Settings     │
 └────────────────────────┬────────────────────────────────┘
                          │ REST API
 ┌────────────────────────▼────────────────────────────────┐
@@ -55,13 +57,46 @@
 │ Job Analyzer │  CV Parser   │Cover Letter │Interview    │
 │              │              │ Generator   │  Preparer   │
 └──────────────┴──────────────┴─────────────┴─────────────┘
-        │               │              │
-        ▼               ▼              ▼
-   ┌─────────┐    ┌──────────┐   ┌──────────┐
-   │ Gemini  │    │PostgreSQL│   │  Claude  │
-   │   API   │    │    DB    │   │   API    │
-   └─────────┘    └──────────┘   └──────────┘
+                       │
+          ┌────────────▼────────────┐
+          │   LLM Provider Layer    │
+          │  (provider abstraction) │
+          └────────┬────────────────┘
+         ┌─────────┼──────────┐
+         ▼         ▼          ▼
+     ┌───────┐ ┌───────┐ ┌────────┐
+     │Gemini │ │Claude │ │OpenAI  │
+     └───────┘ └───────┘ └────────┘
+                    │
+             ┌──────▼──────┐
+             │ PostgreSQL  │
+             │     DB      │
+             └─────────────┘
 ```
+
+---
+
+## 🔌 Multi-provider LLM Support
+
+LaunchPad uses a **provider abstraction layer** that decouples all AI services from any specific LLM vendor. Every service (`JobAnalyzer`, `CVParser`, `CoverLetterGenerator`, `InterviewPreparer`) receives a provider instance at runtime — switching models requires zero code changes.
+
+```python
+# All services follow the same pattern
+class JobAnalyzer:
+    def __init__(self, provider: BaseLLMProvider):
+        self.provider = provider  # Gemini, Claude or OpenAI
+
+    def analyze_job(self, description: str) -> dict:
+        return self.provider.generate_json(prompt)  # Same call, any provider
+```
+
+Configure your preferred provider in the **Settings** page — your API key is validated before saving and stored locally.
+
+| Provider | Model | Free tier | Best for |
+|----------|-------|-----------|----------|
+| **Google Gemini** | gemini-3.1-flash-lite-preview | ✅ Yes | Default, fast, cost-effective |
+| **Anthropic Claude** | claude-sonnet-4 | ❌ No | Nuanced writing, cover letters |
+| **OpenAI GPT** | gpt-4o-mini | ❌ No | Versatile, reliable |
 
 ---
 
@@ -71,10 +106,12 @@
 ```
 Paste job posting
       ↓
-Gemini extracts → title, company, skills, ATS keywords,
-                  responsibilities, salary, benefits
+LLM extracts → title, company, skills, ATS keywords,
+               responsibilities, salary, benefits
       ↓
 If CV uploaded → Match Score calculated automatically
+      ↓
+Match details persisted (strengths, gaps, recommendations)
       ↓
 Application saved to dashboard
 ```
@@ -101,8 +138,10 @@ Copy & send
 
 - Python 3.10+
 - Node.js 16+
-- Google Gemini API key → [Get one here](https://makersuite.google.com/app/apikey)
-- Anthropic Claude API key → [Get one here](https://console.anthropic.com)
+- API key for at least one provider:
+  - Google Gemini (free) → [Get one here](https://makersuite.google.com/app/apikey)
+  - Anthropic Claude → [Get one here](https://console.anthropic.com)
+  - OpenAI → [Get one here](https://platform.openai.com/api-keys)
 
 ### 1. Clone the repo
 
@@ -126,24 +165,45 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env — only GEMINI_API_KEY is required as fallback
 ```
 
 **.env file:**
 ```env
 DATABASE_URL=sqlite:///./job_assistant.db
 GEMINI_API_KEY=your_gemini_key_here
-ANTHROPIC_API_KEY=your_claude_key_here
 ```
 
-### 3. Frontend setup
+### 3. Database setup
+
+```bash
+python3 -c "
+from models.database import engine, Base
+from models.models import *
+from sqlalchemy import text, inspect
+
+Base.metadata.create_all(bind=engine)
+
+inspector = inspect(engine)
+existing = [col['name'] for col in inspector.get_columns('applications')]
+
+with engine.connect() as conn:
+    if 'match_details' not in existing:
+        conn.execute(text('ALTER TABLE applications ADD COLUMN match_details JSON'))
+    conn.commit()
+
+print('Migration complete')
+"
+```
+
+### 4. Frontend setup
 
 ```bash
 cd frontend
 npm install
 ```
 
-### 4. Run the app
+### 5. Run the app
 
 ```bash
 # Terminal 1 — Backend
@@ -158,33 +218,31 @@ npm start
 # App running at http://localhost:3000
 ```
 
+### 6. Configure your LLM provider
+
+Go to **Paramètres** in the app, select your preferred provider and enter your API key.
+
 ---
 
 ## 📱 Usage
 
-### Step 1 — Upload your CV
+### Step 1 — Configure your provider
+Go to **Paramètres**, choose Gemini, Claude or OpenAI and enter your API key.
+
+### Step 2 — Upload your CV
 Go to **Mon CV** and upload your PDF. LaunchPad extracts your full profile automatically.
 
-### Step 2 — Analyse a job posting
-Click **Nouvelle candidature**, paste the job description and let the AI work.  
-You'll instantly see:
-- Extracted skills and ATS keywords
-- Your compatibility score (0–100)
-- Strengths, gaps and recommendations
+### Step 3 — Analyse a job posting
+Click **Nouvelle candidature**, paste the job description and let the AI work.
 
-### Step 3 — Generate your cover letter
-Open the application detail and click **Générer 3 versions**.  
-Switch between Formal, Startup and Tech tones — copy the best one.
+### Step 4 — Generate your cover letter
+Open the application detail and click **Générer 3 versions**. Switch between Formal, Startup and Tech tones.
 
-### Step 4 — Prepare your interview
-Click **Générer la préparation** to get:
-- General questions with suggested answers
-- Technical questions by topic
-- Behavioural questions with STAR examples
-- Smart questions to ask the recruiter
+### Step 5 — Prepare your interview
+Click **Générer la préparation** to get questions, STAR framework tips and smart questions to ask the recruiter.
 
-### Step 5 — Track your applications
-Update statuses as you progress: **Draft → Applied → Interview → Offer / Rejected**
+### Step 6 — Track your applications
+Update statuses: **Draft → Applied → Interview → Offer / Rejected**
 
 ---
 
@@ -194,28 +252,29 @@ Update statuses as you progress: **Draft → Applied → Interview → Offer / R
 launchpad/
 ├── backend/
 │   ├── api/
-│   │   ├── jobs.py              # Job analysis endpoints
-│   │   ├── cvs.py               # CV upload endpoints
-│   │   ├── applications.py      # Application tracking
-│   │   ├── cover_letters.py     # Cover letter generation
-│   │   └── interview_prep.py    # Interview preparation
+│   │   ├── jobs.py
+│   │   ├── cvs.py
+│   │   ├── applications.py
+│   │   ├── cover_letters.py
+│   │   ├── interview_prep.py
+│   │   └── settings.py          # LLM provider configuration
 │   ├── models/
-│   │   ├── database.py          # SQLAlchemy setup
-│   │   └── models.py            # DB models (Job, Application, CV, CoverLetter)
+│   │   ├── database.py
+│   │   └── models.py            # Job, Application, CV, CoverLetter, UserSettings
 │   ├── services/
-│   │   ├── job_analyzer.py      # LLM job analysis + match scoring
-│   │   ├── cv_parser.py         # PDF extraction + CV parsing
-│   │   ├── cover_letter_generator.py  # Multi-tone generation
-│   │   ├── interview_prep.py    # Question generation
-│   │   └── analytics.py        # Dashboard stats
-│   ├── main.py                  # FastAPI app entry point
+│   │   ├── llm_provider.py      # Provider abstraction (Gemini, Claude, OpenAI)
+│   │   ├── job_analyzer.py
+│   │   ├── cv_parser.py
+│   │   ├── cover_letter_generator.py
+│   │   ├── interview_prep.py
+│   │   └── analytics.py
+│   ├── main.py
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── components/          # GlassCard, NeonButton, StatusBadge...
-│   │   ├── pages/               # Dashboard, NewApplication, Detail, UploadCV
-│   │   └── services/
-│   │       └── api.js           # API service layer
+│   │   ├── components/
+│   │   ├── pages/               # Dashboard, NewApplication, Detail, UploadCV, Settings
+│   │   └── services/api.js
 │   └── package.json
 ├── .env.example
 └── README.md
@@ -227,6 +286,8 @@ launchpad/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/api/settings/` | Get current provider config |
+| `POST` | `/api/settings/` | Update provider + API key |
 | `POST` | `/api/jobs/analyze` | Analyse a job posting |
 | `GET` | `/api/jobs/` | List all jobs |
 | `POST` | `/api/jobs/recalculate-all-scores` | Recalculate match scores |
@@ -239,23 +300,26 @@ launchpad/
 | `POST` | `/api/cover-letters/generate-all-tones` | Generate 3 versions |
 | `GET` | `/api/interview-prep/{id}` | Generate interview prep |
 
-Full interactive docs available at `http://localhost:8000/docs`
+Full interactive docs at `http://localhost:8000/docs`
 
 ---
 
 ## 🧠 Key Technical Decisions
 
-**Why RAG-inspired architecture instead of fine-tuning?**  
-Job postings and CVs change constantly. Fine-tuning is expensive and rigid. The LLM Judge approach (passing structured context at inference time) is flexible, updatable and traceable.
+**Why a provider abstraction layer?**  
+Vendor lock-in is a real risk with LLM APIs. The `BaseLLMProvider` interface decouples all business logic from any specific provider. Switching from Gemini to Claude is a single settings change — zero code touched.
 
-**Why Gemini for analysis + Claude for writing?**  
-Gemini Flash is fast and cost-effective for structured extraction and JSON output. Claude produces noticeably more natural prose for cover letters — the two complement each other well.
+**Why RAG-inspired architecture instead of fine-tuning?**  
+Job postings and CVs change constantly. Fine-tuning is expensive and rigid. The LLM Judge approach is flexible, updatable and traceable.
 
 **Why persist match_details in the database?**  
-Match scores are only useful if you can review the reasoning later. Storing the full breakdown (strengths, gaps, recommendations) means insights are available every time you open an application.
+Match scores are only useful if you can review the reasoning later. Storing the full breakdown means insights are available every time you open an application.
 
-**Why optional CV upload (not mandatory)?**  
-Forcing CV upload before exploring breaks the flow. Users can analyse jobs first, then upload their CV and trigger score recalculation — reducing friction without sacrificing functionality.
+**Why optional CV upload?**  
+Forcing CV upload before exploring breaks the flow. Users can analyse jobs first, upload their CV later and trigger score recalculation.
+
+**Why Gemini as the default?**  
+Generous free tier, fast response times and solid performance. The abstraction layer means users can switch to Claude or GPT-4o with one click.
 
 ---
 
